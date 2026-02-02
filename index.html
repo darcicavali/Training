@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Training" />
+  <title>Training</title>
+  <style>
+    :root { --pad: 14px; --radius: 14px; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial;
+      background: #0b0c10;
+      color: #e9eef5;
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      padding: calc(var(--pad) + env(safe-area-inset-top)) var(--pad) var(--pad) var(--pad);
+      background: rgba(11,12,16,0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    }
+    header .title { font-weight: 700; font-size: 18px; }
+    header .sub { font-size: 12px; opacity: 0.8; }
+    main { padding: var(--pad); padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+    .row { display: flex; gap: 10px; align-items: center; }
+    .btn {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: #e9eef5;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn.primary { background: #2b6cff; border-color: #2b6cff; }
+    .btn.danger { background: rgba(255,70,70,0.18); border-color: rgba(255,70,70,0.35); }
+    .btn.small { padding: 8px 10px; font-size: 13px; border-radius: 12px; }
+    .card {
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin: 10px 0;
+    }
+    .card h3 { margin: 0 0 6px; font-size: 16px; }
+    .muted { opacity: 0.8; }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      margin-right: 6px;
+    }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    input, textarea, select {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: #e9eef5;
+      padding: 10px 10px;
+      font-size: 14px;
+    }
+    textarea { min-height: 70px; resize: vertical; }
+    .list-item {
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 12px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      margin: 10px 0;
+    }
+    .list-item .top {
+      display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+    }
+    .list-item .name { font-weight: 700; font-size: 15px; }
+    .list-item .rx { font-size: 13px; opacity: 0.9; text-align: right; }
+    .list-item .note { font-size: 13px; opacity: 0.78; }
+    .footerbar {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      padding: 10px var(--pad) calc(10px + env(safe-area-inset-bottom)) var(--pad);
+      background: rgba(11,12,16,0.94);
+      border-top: 1px solid rgba(255,255,255,0.07);
+      display: flex; gap: 10px; justify-content: space-between; align-items: center;
+    }
+    .link { color: #9fc0ff; text-decoration: underline; cursor: pointer; }
+    .divider { height: 1px; background: rgba(255,255,255,0.08); margin: 10px 0; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="title" id="hdrTitle">Training</div>
+      <div class="sub" id="hdrSub">Day picker</div>
+    </div>
+    <div class="row">
+      <button class="btn small" id="btnHome">Home</button>
+      <button class="btn small" id="btnExport">Export</button>
+      <button class="btn small danger" id="btnReset">Reset</button>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <div class="footerbar" id="footerbar" style="display:none;">
+    <div class="muted" id="footerLeft"></div>
+    <div class="row">
+      <button class="btn" id="btnHistory">History</button>
+      <button class="btn primary" id="btnFinish">Finish</button>
+    </div>
+  </div>
+
+<script>
+/** ========= Data: May 2023 plan (as provided) ========= */
+const PLAN = [
+  {
+    id: "d1", dayLabel: "Day 1", title: "Back & Shoulders (A)",
+    blocks: [
+      { name: "Main", items: [
+        ex("Machine shoulder press", rx(["15","12","10"]), "Controlled"),
+        ex("Front pulldowns", rx(["15","12","10"]), ""),
+        ex("T Bar Rows", rx(["12","10","8"]), "Heavy"),
+        ex("DB shrugs", rx3(10), "Extra slow, full ROM, strict form"),
+        ex("DB bent over laterals", rx(["12","10","10"]), "Strict"),
+        ex("1 arm cable low rows", rx3(10), "Moderate, palms up, slow & strict"),
+        ex("Cable pullovers", rx(["15","12","10"]), "Stretch"),
+        ex("Cable side laterals", rx(["15","12","10"]), "Control"),
+        ex("Seated machine rows", rx3(8), "Go heavy, rest 90s"),
+        ex("Rope face pulls", rx3(15), "50% slower than normal, focus"),
+        ex("Back exercise to failure", "3 sets to failure", "Perfect form only"),
+      ]}
+    ]
+  },
+  {
+    id: "d2", dayLabel: "Day 2", title: "Chest & Arms (A)",
+    blocks: [
+      { name: "Chest", items: [
+        ex("Cable incline flys", rx(["15","12","10"]), "Stretch + control"),
+        ex("Body weight dips", "3×12–20", "Lean forward to target chest; slow"),
+        ex("Incline DB press", "3×10,8,8", "Rest 90s; touch DBs at the top"),
+        ex("Machine flat press", "3 sets: (5-4-3-2-1) with 3s rest between mini-sets", "One ladder = 5 reps, rest 3s, 4 reps, rest 3s ... 1 rep"),
+      ]},
+      { name: "Arms", items: [
+        ex("Alternating DB curls", rx(["15","12","10"]), ""),
+        ex("EZ bar close grip press", rx3(10), ""),
+        ex("Reverse grip EZ curl bar", rx(["15","12","10"]), ""),
+        ex("Rope pushdowns", rx3(10), ""),
+        ex("1 arm cable kick backs", "3×F", "Go light (15–20 lb), squeeze"),
+        ex("1 arm cable concentration curls", "3×F", "Go light (15–20 lb), squeeze"),
+      ]}
+    ]
+  },
+  {
+    id: "d3", dayLabel: "Day 3", title: "Legs (A)",
+    blocks: [
+      { name: "Legs", items: [
+        ex("1 leg extensions", rx(["20","15","12"]), ""),
+        ex("Flat curls", rx3(20), ""),
+        ex("DB lunges", "3×10 each leg", ""),
+        ex("Smith Machine squats", rx3(10), "Moderate weight, slow & strict; glutes/hams"),
+        ex("Hack squats w/bands", rx3(20), "10 full reps (shoulder width) + 10 short reps (feet touching)"),
+        ex("Single leg curls", rx3(10), "Moderate weight; focus on squeeze"),
+        ex("Extensions (rest-pause)", "10 reps, rest 3s, 5 reps, rest 3s, 5 reps", ""),
+        ex("Calf presses on leg press", rx3(20), ""),
+        ex("Seated calf raises", rx3(20), ""),
+      ]}
+    ]
+  },
+  {
+    id: "d4", dayLabel: "Day 4", title: "Back & Shoulders (B)",
+    blocks: [
+      { name: "Main", items: [
+        ex("DB side laterals", rx(["15","12","10"]), ""),
+        ex("V bar cable low rows", rx(["12","10","8"]), ""),
+        ex("Smith machine front press", rx3(10), ""),
+        ex("Machine or cable pulldowns", rx(["15","12","10"]), "Super slow & strict; go lighter"),
+        ex("Reverse pec dec / kenesis machine", rx(["15","12","10"]), ""),
+        ex("Barbell shrugs", rx3(10), "Go heavy; use wrist wraps; rest as needed"),
+        ex("1 arm DB rows", rx3(10), "Go heavy; use wrist wraps; rest as needed"),
+        ex("DB shoulder press + EZ upright rows + Assisted chins", "Superset (auto-regulated)", "Pick weights/reps based on how you feel that day"),
+      ]}
+    ]
+  },
+  {
+    id: "d5", dayLabel: "Day 5", title: "Chest & Arms (B)",
+    blocks: [
+      { name: "Chest", items: [
+        ex("Incline barbell", "4×12,10,8,8", ""),
+        ex("Flat dumbbell press", rx4(10), "Superset with Incline DB flys (no rest)"),
+        ex("Incline DB flys", rx4(10), "No rest after presses; stay light; focus on muscle"),
+        ex("Incline machine press", "12,10,10,F", "Last set: 1 plate → failure; slow"),
+      ]},
+      { name: "Arms", items: [
+        ex("EZ bar 21s", "3 sets", ""),
+        ex("EZ bar skull crushers", "3 sets", ""),
+        ex("Cable curls from the top", "3×F @ 20 lb", ""),
+        ex("V bar pushdowns", "3 sets (heavy)", ""),
+        ex("DB hammer curls", rx3(10), ""),
+        ex("Bodyweight close grip press", "3×F", ""),
+      ]}
+    ]
+  },
+  {
+    id: "d6", dayLabel: "Day 6", title: "Legs (B)",
+    blocks: [
+      { name: "Legs", items: [
+        ex("Walking lunges (no weight)", "3 sets: 20 steps each leg", ""),
+        ex("Standing calf raises (bodyweight)", "3×30", "Slow & strict"),
+        ex("Leg press", rx(["12","10","10"]), "Relax hips; go 25% slower than normal"),
+        ex("Extensions (heavy)", rx3(10), ""),
+        ex("Flat or seated curls", rx(["15","12","10"]), ""),
+        ex("Abductor", rx3(20), "Super strict & slow"),
+        ex("Adductor", rx3(20), "Super strict & slow"),
+        ex("Pendulum squat", "3 sets: 3 plates, 4 plates, 5 plates", "Max good reps each set; strong finish"),
+        ex("Seated calf raises", "100 reps", ""),
+      ]}
+    ]
+  },
+];
+
+function ex(name, rxText, note){ return { name, rx: rxText, note: note || "" }; }
+function rx(arr){ return arr.join(","); }
+function rx3(rep){ return `3×${rep}`; }
+function rx4(rep){ return `4×${rep}`; }
+
+/** ========= Storage ========= */
+const KEY = "training_app_v1";
+const load = () => JSON.parse(localStorage.getItem(KEY) || '{"sessions":[]}');
+const save = (db) => localStorage.setItem(KEY, JSON.stringify(db));
+
+/** ========= App State ========= */
+let state = {
+  view: "home",         // home | day | log | history
+  activeDayId: null,
+  activeExerciseName: null,
+  activeSessionId: null,
+};
+
+function todayISO(){
+  const d = new Date();
+  return d.toISOString();
+}
+
+/** ========= Helpers ========= */
+function $(id){ return document.getElementById(id); }
+function setHeader(title, sub){
+  $("hdrTitle").textContent = title;
+  $("hdrSub").textContent = sub || "";
+}
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+}
+function getDay(dayId){ return PLAN.find(d => d.id === dayId); }
+
+function getOrCreateSession(dayId){
+  const db = load();
+  // Find open session for this day
+  let s = db.sessions.find(x => x.id === state.activeSessionId);
+  if (s) return s;
+
+  // Create new session
+  const session = {
+    id: crypto.randomUUID(),
+    createdAt: todayISO(),
+    dayId,
+    dayTitle: getDay(dayId).title,
+    logs: {} // exerciseName -> { sets: [{weight,reps,note}], note }
+  };
+  db.sessions.unshift(session);
+  save(db);
+  state.activeSessionId = session.id;
+  return session;
+}
+
+function updateExerciseLog(exName, updater){
+  const db = load();
+  const s = db.sessions.find(x => x.id === state.activeSessionId);
+  if (!s) return;
+  if (!s.logs[exName]) s.logs[exName] = { sets: [], note: "" };
+  updater(s.logs[exName]);
+  save(db);
+}
+
+function findLastLogForExercise(exName){
+  const db = load();
+  for (const s of db.sessions){
+    if (s.id === state.activeSessionId) continue;
+    if (s.logs && s.logs[exName]) return { session: s, log: s.logs[exName] };
+  }
+  return null;
+}
+
+/** ========= Rendering ========= */
+function render(){
+  const app = $("app");
+  const footer = $("footerbar");
+  footer.style.display = (state.view === "day" || state.view === "log") ? "flex" : "none";
+
+  if (state.view === "home"){
+    setHeader("Training", "Pick your training day");
+    app.innerHTML = `
+      <div class="card">
+        <div class="muted">May 2023 Program</div>
+        <div class="divider"></div>
+        <div class="grid2">
+          ${PLAN.map(d => `
+            <button class="btn primary" style="width:100%;" onclick="goDay('${d.id}')">
+              ${d.dayLabel}<div class="muted" style="font-size:12px;margin-top:4px;">${d.title}</div>
+            </button>
+          `).join("")}
+        </div>
+        <div class="divider"></div>
+        <div class="muted">Tip: On iPhone Safari, tap <span class="kbd">Share</span> → <span class="kbd">Add to Home Screen</span>.</div>
+      </div>
+
+      <div class="card">
+        <h3>History</h3>
+        <div class="muted">See your recent sessions and exercise logs.</div>
+        <div style="margin-top:10px;">
+          <button class="btn" onclick="goHistory()">Open History</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (state.view === "day"){
+    const day = getDay(state.activeDayId);
+    const session = getOrCreateSession(day.id);
+    setHeader(day.title, `Session started: ${fmtDate(session.createdAt)}`);
+
+    $("footerLeft").textContent = "Tap an exercise to log sets";
+
+    const items = day.blocks.flatMap(b => b.items.map(it => ({...it, block: b.name})));
+    app.innerHTML = `
+      ${day.blocks.map(b => `
+        <div class="card">
+          <h3>${b.name}</h3>
+          ${b.items.map(it => `
+            <div class="list-item" onclick="goLog('${escapeQuotes(it.name)}')">
+              <div class="top">
+                <div class="name">${it.name}</div>
+                <div class="rx"><span class="pill">${it.rx}</span></div>
+              </div>
+              ${it.note ? `<div class="note">${it.note}</div>` : ``}
+              ${renderLastLine(it.name)}
+            </div>
+          `).join("")}
+        </div>
+      `).join("")}
+    `;
+    return;
+  }
+
+  if (state.view === "log"){
+    const day = getDay(state.activeDayId);
+    const session = getOrCreateSession(day.id);
+    const exName = state.activeExerciseName;
+
+    const exDef = day.blocks.flatMap(b => b.items).find(i => i.name === exName);
+    const rxText = exDef ? exDef.rx : "";
+    const noteText = exDef ? exDef.note : "";
+
+    setHeader(exName, `${day.dayLabel} • ${day.title}`);
+
+    const db = load();
+    const s = db.sessions.find(x => x.id === state.activeSessionId);
+    const log = (s && s.logs && s.logs[exName]) ? s.logs[exName] : { sets: [], note: "" };
+
+    const last = findLastLogForExercise(exName);
+    const lastHint = last ? `Last: ${fmtDate(last.session.createdAt)}` : "No previous log found";
+
+    app.innerHTML = `
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <div><span class="pill">${rxText || "—"}</span></div>
+            ${noteText ? `<div class="muted" style="margin-top:8px;">${noteText}</div>` : ``}
+          </div>
+          <div style="text-align:right;">
+            <div class="muted" style="font-size:12px;">${lastHint}</div>
+            <button class="btn small" style="margin-top:8px;" onclick="copyLast('${escapeQuotes(exName)}')">Copy last</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Sets</h3>
+        <div class="muted">Enter weight (lb) and reps completed.</div>
+        <div style="margin-top:10px;">
+          ${renderSetsEditor(exName, log.sets)}
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" onclick="addSet('${escapeQuotes(exName)}')">+ Add set</button>
+          <button class="btn danger" onclick="clearSets('${escapeQuotes(exName)}')">Clear</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Exercise notes (optional)</h3>
+        <textarea placeholder="e.g., slow tempo, strict form, failure set details" oninput="setExerciseNote('${escapeQuotes(exName)}', this.value)">${escapeHtml(log.note || "")}</textarea>
+      </div>
+
+      ${renderExerciseHistory(exName)}
+    `;
+    return;
+  }
+
+  if (state.view === "history"){
+    setHeader("History", "Recent sessions and exercise logs");
+    const db = load();
+    app.innerHTML = `
+      <div class="card">
+        <h3>Recent sessions</h3>
+        ${db.sessions.length ? db.sessions.slice(0,20).map(s => `
+          <div class="list-item">
+            <div class="top">
+              <div class="name">${s.dayTitle}</div>
+              <div class="rx">${fmtDate(s.createdAt)}</div>
+            </div>
+            <div class="note muted">${Object.keys(s.logs || {}).length} exercises logged</div>
+          </div>
+        `).join("") : `<div class="muted">No sessions yet.</div>`}
+      </div>
+      <div class="card">
+        <h3>Quick jump</h3>
+        <div class="muted">Tap a day, then tap an exercise to see/set logs.</div>
+        <div class="grid2" style="margin-top:10px;">
+          ${PLAN.map(d => `<button class="btn" style="width:100%;" onclick="goDay('${d.id}')">${d.dayLabel}</button>`).join("")}
+        </div>
+      </div>
+    `;
+    return;
+  }
+}
+
+/** ========= Small render helpers ========= */
+function renderLastLine(exName){
+  const last = findLastLogForExercise(exName);
+  if (!last) return `<div class="muted" style="font-size:12px;">No previous log</div>`;
+  const sets = (last.log.sets || []).slice(0,3).map(s => `${s.weight || "—"}lb×${s.reps || "—"}`).join(" • ");
+  return `<div class="muted" style="font-size:12px;">Last: ${sets}${(last.log.sets||[]).length>3 ? " • ..." : ""}</div>`;
+}
+
+function renderSetsEditor(exName, sets){
+  if (!sets || !sets.length){
+    return `<div class="muted">No sets yet. Tap “Add set”.</div>`;
+  }
+  return sets.map((s, idx) => `
+    <div class="card" style="margin:10px 0; padding:10px;">
+      <div class="row" style="justify-content:space-between;">
+        <div class="pill">Set ${idx+1}</div>
+        <button class="btn small danger" onclick="removeSet('${escapeQuotes(exName)}', ${idx})">Remove</button>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <div>
+          <div class="muted" style="font-size:12px;margin-bottom:6px;">Weight (lb)</div>
+          <input inputmode="decimal" placeholder="e.g., 45" value="${escapeHtml(s.weight ?? "")}" oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'weight', this.value)" />
+        </div>
+        <div>
+          <div class="muted" style="font-size:12px;margin-bottom:6px;">Reps</div>
+          <input inputmode="numeric" placeholder="e.g., 10" value="${escapeHtml(s.reps ?? "")}" oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'reps', this.value)" />
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="muted" style="font-size:12px;margin-bottom:6px;">Set note (optional)</div>
+        <input placeholder="e.g., slow tempo, to failure" value="${escapeHtml(s.note ?? "")}" oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'note', this.value)" />
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderExerciseHistory(exName){
+  const db = load();
+  const entries = [];
+  for (const s of db.sessions){
+    if (s.logs && s.logs[exName] && (s.logs[exName].sets || []).length){
+      entries.push({ session: s, log: s.logs[exName] });
+    }
+    if (entries.length >= 5) break;
+  }
+  if (!entries.length) return `
+    <div class="card">
+      <h3>Recent history</h3>
+      <div class="muted">No logged sets for this exercise yet.</div>
+    </div>
+  `;
+  return `
+    <div class="card">
+      <h3>Recent history</h3>
+      ${entries.map(e => `
+        <div class="list-item">
+          <div class="top">
+            <div class="name">${fmtDate(e.session.createdAt)}</div>
+            <div class="rx">${e.session.dayTitle}</div>
+          </div>
+          <div class="note">${(e.log.sets||[]).map(s => `${s.weight || "—"}lb×${s.reps || "—"}`).join(" • ")}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+/** ========= Actions ========= */
+function goDay(dayId){
+  state.view = "day";
+  state.activeDayId = dayId;
+  state.activeExerciseName = null;
+  // New session per day tap, unless one already active
+  state.activeSessionId = null;
+  render();
+}
+function goLog(exName){
+  state.view = "log";
+  state.activeExerciseName = exName;
+  render();
+}
+function goHome(){
+  state.view = "home";
+  state.activeDayId = null;
+  state.activeExerciseName = null;
+  state.activeSessionId = null;
+  render();
+}
+function goHistory(){
+  state.view = "history";
+  render();
+}
+
+function addSet(exName){
+  updateExerciseLog(exName, (log) => {
+    log.sets.push({ weight: "", reps: "", note: "" });
+  });
+  render();
+}
+function removeSet(exName, idx){
+  updateExerciseLog(exName, (log) => {
+    log.sets.splice(idx, 1);
+  });
+  render();
+}
+function clearSets(exName){
+  updateExerciseLog(exName, (log) => {
+    log.sets = [];
+    log.note = "";
+  });
+  render();
+}
+function editSet(exName, idx, field, value){
+  updateExerciseLog(exName, (log) => {
+    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"" };
+    log.sets[idx][field] = value;
+  });
+}
+function setExerciseNote(exName, value){
+  updateExerciseLog(exName, (log) => { log.note = value; });
+}
+function copyLast(exName){
+  const last = findLastLogForExercise(exName);
+  if (!last) { alert("No previous log found for this exercise."); return; }
+  updateExerciseLog(exName, (log) => {
+    log.sets = (last.log.sets || []).map(s => ({ weight: s.weight || "", reps: s.reps || "", note: "" }));
+  });
+  render();
+}
+
+function finishSession(){
+  if (!state.activeSessionId){ goHome(); return; }
+  alert("Workout saved.");
+  state.activeSessionId = null;
+  state.view = "day";
+  render();
+}
+
+/** ========= Export / Reset ========= */
+function exportData(){
+  const db = load();
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "training_logs.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function resetAll(){
+  const ok = confirm("This will delete all your logs on this phone. Continue?");
+  if (!ok) return;
+  localStorage.removeItem(KEY);
+  goHome();
+}
+
+/** ========= Safety: escaping ========= */
+function escapeQuotes(s){ return String(s).replaceAll("'", "\\'"); }
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+/** ========= Wire buttons ========= */
+$("btnHome").addEventListener("click", goHome);
+$("btnHistory").addEventListener("click", goHistory);
+$("btnFinish").addEventListener("click", finishSession);
+$("btnExport").addEventListener("click", exportData);
+$("btnReset").addEventListener("click", resetAll);
+
+render();
+</script>
+</body>
+</html>
