@@ -299,16 +299,6 @@
       50% { transform: scale(1.05); }
     }
     
-    /* Weight Adjuster */
-    .weight-input-group {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .weight-input-group input {
-      flex: 1;
-    }
-    
     /* Rating Stars */
     .rating-stars {
       display: flex;
@@ -1176,40 +1166,30 @@ function renderSetsEditor(exName, sets, lastLog, exerciseType, defaultRestTime){
             <button class="btn mini" onclick="removeSet('${escapeQuotes(exName)}', ${idx})">×</button>
           </div>
         </div>
-        <div class="grid2" style="margin-top:10px;gap:6px;">
+        <div class="grid2" style="margin-top:10px;gap:10px;">
           ${!isBodyweight ? `
             <div>
               <div class="muted" style="font-size:12px;margin-bottom:6px;">Weight (lb)</div>
-              <div class="weight-input-group">
-                <button class="btn mini" onclick="adjustWeight('${escapeQuotes(exName)}', ${idx}, -5)">-5</button>
-                <button class="btn mini" onclick="adjustWeight('${escapeQuotes(exName)}', ${idx}, -2.5)">-2.5</button>
-                <input 
-                  id="weight_${idx}" 
-                  inputmode="decimal" 
-                  placeholder="lbs" 
-                  value="${escapeHtml(s.weight ?? "")}" 
-                  oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'weight', this.value)"
-                  onfocus="this.select()"
-                />
-                <button class="btn mini" onclick="adjustWeight('${escapeQuotes(exName)}', ${idx}, 2.5)">+2.5</button>
-                <button class="btn mini" onclick="adjustWeight('${escapeQuotes(exName)}', ${idx}, 5)">+5</button>
-              </div>
+              <input 
+                id="weight_${idx}" 
+                inputmode="decimal" 
+                placeholder="lbs" 
+                value="${escapeHtml(s.weight ?? "")}" 
+                oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'weight', this.value)"
+                onfocus="this.select()"
+              />
             </div>
           ` : '<div></div>'}
           <div>
             <div class="muted" style="font-size:12px;margin-bottom:6px;">Reps</div>
-            <div class="weight-input-group">
-              <button class="btn mini" onclick="adjustReps('${escapeQuotes(exName)}', ${idx}, -1)">-1</button>
-              <input 
-                id="reps_${idx}"
-                inputmode="numeric" 
-                placeholder="reps" 
-                value="${escapeHtml(s.reps ?? "")}" 
-                oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'reps', this.value)"
-                onfocus="this.select()"
-              />
-              <button class="btn mini" onclick="adjustReps('${escapeQuotes(exName)}', ${idx}, 1)">+1</button>
-            </div>
+            <input 
+              id="reps_${idx}"
+              inputmode="numeric" 
+              placeholder="reps" 
+              value="${escapeHtml(s.reps ?? "")}" 
+              oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'reps', this.value)"
+              onfocus="this.select()"
+            />
           </div>
         </div>
         ${!isBodyweight && s.weight ? renderPlateCalculator(s.weight, exerciseType) : ''}
