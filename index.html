@@ -365,17 +365,17 @@ const PLAN = [
     id: "d1", dayLabel: "Day 1", title: "Back & Shoulders (A)",
     blocks: [
       { name: "Main", items: [
-        ex("Machine shoulder press", rx(["15","12","10"]), "Controlled", "machine", 90, "machine+shoulder+press+form"),
-        ex("Front pulldowns", rx(["15","12","10"]), "", "cable", 90, "lat+pulldown+form+tutorial"),
-        ex("T Bar Rows", rx(["12","10","8"]), "Heavy", "barbell", 120, "t+bar+row+form"),
+        ex("Machine shoulder press", rx(["15","12","10"]), "Controlled", "machine", 60, "machine+shoulder+press+form"),
+        ex("Front pulldowns", rx(["15","12","10"]), "", "cable", 60, "lat+pulldown+form+tutorial"),
+        ex("T Bar Rows", rx(["12","10","8"]), "Heavy", "barbell", 90, "t+bar+row+form"),
         ex("DB shrugs", rx3(10), "Extra slow, full ROM, strict form", "dumbbell", 60, "dumbbell+shrugs+form"),
         ex("DB bent over laterals", rx(["12","10","10"]), "Strict", "dumbbell", 60, "bent+over+lateral+raise"),
-        ex("1 arm cable low rows", rx3(10), "Moderate, palms up, slow & strict", "cable", 75, "single+arm+cable+row"),
+        ex("1 arm cable low rows", rx3(10), "Moderate, palms up, slow & strict", "cable", 60, "single+arm+cable+row"),
         ex("Cable pullovers", rx(["15","12","10"]), "Stretch", "cable", 60, "cable+pullover+form"),
         ex("Cable side laterals", rx(["15","12","10"]), "Control", "cable", 60, "cable+lateral+raise"),
-        ex("Seated machine rows", rx3(8), "Go heavy, rest 90s", "machine", 120, "seated+cable+row+machine"),
+        ex("Seated machine rows", rx3(8), "Go heavy, rest 90s", "machine", 90, "seated+cable+row+machine"),
         ex("Rope face pulls", rx3(15), "50% slower than normal, focus", "cable", 60, "rope+face+pulls+form"),
-        ex("Back exercise to failure", "3 sets to failure", "Perfect form only", "other", 90, "back+exercises"),
+        ex("Back exercise to failure", "3 sets to failure", "Perfect form only", "other", 60, "back+exercises"),
       ]}
     ]
   },
@@ -384,13 +384,13 @@ const PLAN = [
     blocks: [
       { name: "Chest", items: [
         ex("Cable incline flys", rx(["15","12","10"]), "Stretch + control", "cable", 60, "cable+incline+fly"),
-        ex("Body weight dips", "3×12–20", "Lean forward to target chest; slow", "bodyweight", 90, "chest+dips+form"),
-        ex("Incline DB press", "3×10,8,8", "Rest 90s; touch DBs at the top", "dumbbell", 120, "incline+dumbbell+press"),
-        ex("Machine flat press", "3 sets: (5-4-3-2-1) with 3s rest between mini-sets", "One ladder = 5 reps, rest 3s, 4 reps, rest 3s ... 1 rep", "machine", 180, "chest+press+machine"),
+        ex("Body weight dips", "3×12–20", "Lean forward to target chest; slow", "bodyweight", 60, "chest+dips+form"),
+        ex("Incline DB press", "3×10,8,8", "Rest 90s; touch DBs at the top", "dumbbell", 90, "incline+dumbbell+press"),
+        ex("Machine flat press", "3 sets: (5-4-3-2-1) with 3s rest between mini-sets", "One ladder = 5 reps, rest 3s, 4 reps, rest 3s ... 1 rep", "machine", 120, "chest+press+machine"),
       ]},
       { name: "Arms", items: [
         ex("Alternating DB curls", rx(["15","12","10"]), "", "dumbbell", 60, "alternating+dumbbell+curls"),
-        ex("EZ bar close grip press", rx3(10), "", "barbell", 90, "close+grip+bench+press"),
+        ex("EZ bar close grip press", rx3(10), "", "barbell", 60, "close+grip+bench+press"),
         ex("Reverse grip EZ curl bar", rx(["15","12","10"]), "", "barbell", 60, "reverse+grip+curl"),
         ex("Rope pushdowns", rx3(10), "", "cable", 60, "rope+tricep+pushdown"),
         ex("1 arm cable kick backs", "3×F", "Go light (15–20 lb), squeeze", "cable", 45, "cable+kickback+tricep"),
@@ -404,11 +404,11 @@ const PLAN = [
       { name: "Legs", items: [
         ex("1 leg extensions", rx(["20","15","12"]), "", "machine", 60, "single+leg+extension"),
         ex("Flat curls", rx3(20), "", "machine", 60, "lying+leg+curl"),
-        ex("DB lunges", "3×10 each leg", "", "dumbbell", 75, "dumbbell+lunges+form"),
-        ex("Smith Machine squats", rx3(10), "Moderate weight, slow & strict; glutes/hams", "machine", 120, "smith+machine+squat"),
+        ex("DB lunges", "3×10 each leg", "", "dumbbell", 60, "dumbbell+lunges+form"),
+        ex("Smith Machine squats", rx3(10), "Moderate weight, slow & strict; glutes/hams", "machine", 90, "smith+machine+squat"),
         ex("Hack squats w/bands", rx3(20), "10 full reps (shoulder width) + 10 short reps (feet touching)", "machine", 90, "hack+squat+machine"),
         ex("Single leg curls", rx3(10), "Moderate weight; focus on squeeze", "machine", 60, "single+leg+curl"),
-        ex("Extensions (rest-pause)", "10 reps, rest 3s, 5 reps, rest 3s, 5 reps", "", "machine", 90, "leg+extension+machine"),
+        ex("Extensions (rest-pause)", "10 reps, rest 3s, 5 reps, rest 3s, 5 reps", "", "machine", 60, "leg+extension+machine"),
         ex("Calf presses on leg press", rx3(20), "", "machine", 45, "calf+press+leg+press"),
         ex("Seated calf raises", rx3(20), "", "machine", 45, "seated+calf+raise"),
       ]}
@@ -419,13 +419,13 @@ const PLAN = [
     blocks: [
       { name: "Main", items: [
         ex("DB side laterals", rx(["15","12","10"]), "", "dumbbell", 60, "dumbbell+lateral+raise"),
-        ex("V bar cable low rows", rx(["12","10","8"]), "", "cable", 90, "v+bar+cable+row"),
-        ex("Smith machine front press", rx3(10), "", "machine", 120, "smith+machine+shoulder+press"),
-        ex("Machine or cable pulldowns", rx(["15","12","10"]), "Super slow & strict; go lighter", "machine", 75, "lat+pulldown+form"),
+        ex("V bar cable low rows", rx(["12","10","8"]), "", "cable", 60, "v+bar+cable+row"),
+        ex("Smith machine front press", rx3(10), "", "machine", 90, "smith+machine+shoulder+press"),
+        ex("Machine or cable pulldowns", rx(["15","12","10"]), "Super slow & strict; go lighter", "machine", 60, "lat+pulldown+form"),
         ex("Reverse pec dec / kenesis machine", rx(["15","12","10"]), "", "machine", 60, "reverse+pec+deck"),
-        ex("Barbell shrugs", rx3(10), "Go heavy; use wrist wraps; rest as needed", "barbell", 120, "barbell+shrugs+form"),
+        ex("Barbell shrugs", rx3(10), "Go heavy; use wrist wraps; rest as needed", "barbell", 90, "barbell+shrugs+form"),
         ex("1 arm DB rows", rx3(10), "Go heavy; use wrist wraps; rest as needed", "dumbbell", 90, "single+arm+dumbbell+row"),
-        ex("DB shoulder press + EZ upright rows + Assisted chins", "Superset (auto-regulated)", "Pick weights/reps based on how you feel that day", "other", 120, "shoulder+superset"),
+        ex("DB shoulder press + EZ upright rows + Assisted chins", "Superset (auto-regulated)", "Pick weights/reps based on how you feel that day", "other", 90, "shoulder+superset"),
       ]}
     ]
   },
@@ -433,18 +433,18 @@ const PLAN = [
     id: "d5", dayLabel: "Day 5", title: "Chest & Arms (B)",
     blocks: [
       { name: "Chest", items: [
-        ex("Incline barbell", "4×12,10,8,8", "", "barbell", 120, "incline+barbell+bench+press"),
+        ex("Incline barbell", "4×12,10,8,8", "", "barbell", 90, "incline+barbell+bench+press"),
         ex("Flat dumbbell press", rx4(10), "Superset with Incline DB flys (no rest)", "dumbbell", 90, "flat+dumbbell+bench+press"),
         ex("Incline DB flys", rx4(10), "No rest after presses; stay light; focus on muscle", "dumbbell", 60, "incline+dumbbell+fly"),
-        ex("Incline machine press", "12,10,10,F", "Last set: 1 plate → failure; slow", "machine", 90, "incline+chest+press+machine"),
+        ex("Incline machine press", "12,10,10,F", "Last set: 1 plate → failure; slow", "machine", 60, "incline+chest+press+machine"),
       ]},
       { name: "Arms", items: [
-        ex("EZ bar 21s", "3 sets", "", "barbell", 90, "ez+bar+21s+bicep"),
-        ex("EZ bar skull crushers", "3 sets", "", "barbell", 90, "ez+bar+skull+crusher"),
+        ex("EZ bar 21s", "3 sets", "", "barbell", 60, "ez+bar+21s+bicep"),
+        ex("EZ bar skull crushers", "3 sets", "", "barbell", 60, "ez+bar+skull+crusher"),
         ex("Cable curls from the top", "3×F @ 20 lb", "", "cable", 45, "high+cable+curl"),
-        ex("V bar pushdowns", "3 sets (heavy)", "", "cable", 75, "v+bar+tricep+pushdown"),
+        ex("V bar pushdowns", "3 sets (heavy)", "", "cable", 60, "v+bar+tricep+pushdown"),
         ex("DB hammer curls", rx3(10), "", "dumbbell", 60, "hammer+curls+form"),
-        ex("Bodyweight close grip press", "3×F", "", "bodyweight", 90, "close+grip+pushup"),
+        ex("Bodyweight close grip press", "3×F", "", "bodyweight", 60, "close+grip+pushup"),
       ]}
     ]
   },
@@ -454,12 +454,12 @@ const PLAN = [
       { name: "Legs", items: [
         ex("Walking lunges (no weight)", "3 sets: 20 steps each leg", "", "bodyweight", 60, "walking+lunges+form"),
         ex("Standing calf raises (bodyweight)", "3×30", "Slow & strict", "bodyweight", 45, "standing+calf+raise"),
-        ex("Leg press", rx(["12","10","10"]), "Relax hips; go 25% slower than normal", "machine", 120, "leg+press+machine+form"),
-        ex("Extensions (heavy)", rx3(10), "", "machine", 90, "leg+extension+heavy"),
+        ex("Leg press", rx(["12","10","10"]), "Relax hips; go 25% slower than normal", "machine", 90, "leg+press+machine+form"),
+        ex("Extensions (heavy)", rx3(10), "", "machine", 60, "leg+extension+heavy"),
         ex("Flat or seated curls", rx(["15","12","10"]), "", "machine", 60, "leg+curl+machine"),
         ex("Abductor", rx3(20), "Super strict & slow", "machine", 45, "hip+abductor+machine"),
         ex("Adductor", rx3(20), "Super strict & slow", "machine", 45, "hip+adductor+machine"),
-        ex("Pendulum squat", "3 sets: 3 plates, 4 plates, 5 plates", "Max good reps each set; strong finish", "machine", 150, "pendulum+squat+machine"),
+        ex("Pendulum squat", "3 sets: 3 plates, 4 plates, 5 plates", "Max good reps each set; strong finish", "machine", 120, "pendulum+squat+machine"),
         ex("Seated calf raises", "100 reps", "", "machine", 60, "seated+calf+raise+100+reps"),
       ]}
     ]
@@ -497,7 +497,7 @@ function save(db) {
 
 function getDefaultSettings() {
   return {
-    restTimerDefault: 90,
+    restTimerDefault: 60,
     restTimerEnabled: true,
     soundEnabled: true,
     vibrationEnabled: true,
@@ -1195,13 +1195,17 @@ function renderSetsEditor(exName, sets, lastLog, exerciseType, defaultRestTime){
         ${!isBodyweight && s.weight ? renderPlateCalculator(s.weight, exerciseType) : ''}
         <div style="margin-top:10px;">
           <div class="muted" style="font-size:12px;margin-bottom:6px;">Rest time (seconds)</div>
-          <input 
-            type="number" 
-            value="${s.restTime || defaultRestTime}" 
-            oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'restTime', this.value)"
-            placeholder="${defaultRestTime}"
-            style="width:100px;"
-          />
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="btn mini" onclick="adjustRestTime('${escapeQuotes(exName)}', ${idx}, -30)">-30</button>
+            <input 
+              type="number" 
+              value="${s.restTime || defaultRestTime}" 
+              oninput="editSet('${escapeQuotes(exName)}', ${idx}, 'restTime', this.value)"
+              placeholder="${defaultRestTime}"
+              style="width:100px;"
+            />
+            <button class="btn mini" onclick="adjustRestTime('${escapeQuotes(exName)}', ${idx}, 30)">+30</button>
+          </div>
         </div>
         <div style="margin-top:10px;">
           <div class="muted" style="font-size:12px;margin-bottom:6px;">Set note (optional)</div>
@@ -1345,7 +1349,7 @@ function addSet(exName){
   // Get default rest time from exercise definition
   const day = getDay(state.activeDayId);
   const exDef = day.blocks.flatMap(b => b.items).find(i => i.name === exName);
-  const defaultRestTime = exDef ? exDef.restTime : 90;
+  const defaultRestTime = exDef ? exDef.restTime : 60;
   
   updateExerciseLog(exName, (log) => {
     const newSet = {
@@ -1390,7 +1394,7 @@ function clearSets(exName){
 
 function editSet(exName, idx, field, value){
   updateExerciseLog(exName, (log) => {
-    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"", restTime: 90 };
+    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"", restTime: 60 };
     log.sets[idx][field] = value;
   });
   
@@ -1400,14 +1404,14 @@ function editSet(exName, idx, field, value){
     const s = db.sessions.find(x => x.id === state.activeSessionId);
     const log = s?.logs?.[exName];
     const set = log?.sets?.[idx];
-    const restTime = set?.restTime || 90;
+    const restTime = set?.restTime || 60;
     startRestTimer(restTime, exName);
   }
 }
 
 function adjustWeight(exName, idx, delta){
   updateExerciseLog(exName, (log) => {
-    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"", restTime: 90 };
+    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"", restTime: 60 };
     const current = parseFloat(log.sets[idx].weight) || 0;
     const newValue = Math.max(0, current + delta);
     log.sets[idx].weight = newValue.toString();
@@ -1417,7 +1421,7 @@ function adjustWeight(exName, idx, delta){
 
 function adjustReps(exName, idx, delta){
   updateExerciseLog(exName, (log) => {
-    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"", restTime: 90 };
+    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"", restTime: 60 };
     const current = parseInt(log.sets[idx].reps) || 0;
     const newValue = Math.max(0, current + delta);
     log.sets[idx].reps = newValue.toString();
@@ -1429,9 +1433,19 @@ function adjustReps(exName, idx, delta){
     const s = db.sessions.find(x => x.id === state.activeSessionId);
     const log = s?.logs?.[exName];
     const set = log?.sets?.[idx];
-    const restTime = set?.restTime || 90;
+    const restTime = set?.restTime || 60;
     startRestTimer(restTime, exName);
   }
+}
+
+function adjustRestTime(exName, idx, delta){
+  updateExerciseLog(exName, (log) => {
+    if (!log.sets[idx]) log.sets[idx] = { weight:"", reps:"", note:"", restTime: 60 };
+    const current = parseInt(log.sets[idx].restTime) || 60;
+    const newValue = Math.max(30, current + delta); // Minimum 30 seconds
+    log.sets[idx].restTime = newValue;
+  });
+  render();
 }
 
 function setExerciseNote(exName, value){
