@@ -6,6 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Training Pro" />
+  <meta name="theme-color" content="#0b0c10" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <title>Training Pro</title>
   <style>
     :root { 
@@ -340,8 +342,11 @@
       <div class="sub" id="hdrSub">Day picker</div>
     </div>
     <div class="row">
+      <button class="btn small" id="btnBack" style="display:none;">Back</button>
       <button class="btn small" id="btnHome">Home</button>
+      <button class="btn small" id="btnSettings">Settings</button>
       <button class="btn small" id="btnExport">Export</button>
+      <button class="btn small" id="btnImport">Import</button>
       <button class="btn small danger" id="btnReset">Reset</button>
     </div>
   </header>
@@ -357,6 +362,7 @@
   </div>
 
   <div id="restTimerContainer"></div>
+  <input id="importFile" type="file" accept="application/json" style="display:none;" />
 
 <script>
 /** ========= Data: Training plan ========= */
@@ -473,7 +479,7 @@ function ex(name, rxText, note, type, restTime, videoQuery){
     note: note || "", 
     type: type || "other",
     restTime: restTime || 90,
-    videoUrl: `https://www.youtube.com/results?search_query=${videoQuery}+tutorial`
+    videoUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${videoQuery} tutorial`)}`
   }; 
 }
 function rx(arr){ return arr.join(","); }
@@ -482,17 +488,47 @@ function rx4(rep){ return `4×${rep}`; }
 
 /** ========= Storage ========= */
 const KEY = "training_app_pro_v3";
+const DB_VERSION = 4;
+
+function createEmptyDb(){
+  return { version: DB_VERSION, sessions: [], settings: getDefaultSettings() };
+}
 
 function load() {
-  const data = localStorage.getItem(KEY);
-  if (!data) return { sessions: [], settings: getDefaultSettings() };
-  const parsed = JSON.parse(data);
-  if (!parsed.settings) parsed.settings = getDefaultSettings();
-  return parsed;
+  try {
+    const data = localStorage.getItem(KEY);
+    if (!data) return createEmptyDb();
+    return migrateDb(JSON.parse(data));
+  } catch (error) {
+    console.warn("Workout data could not be loaded. Starting with an empty database.", error);
+    return createEmptyDb();
+  }
 }
 
 function save(db) {
-  localStorage.setItem(KEY, JSON.stringify(db));
+  const normalized = migrateDb(db);
+  normalized.version = DB_VERSION;
+  localStorage.setItem(KEY, JSON.stringify(normalized));
+}
+
+function migrateDb(db) {
+  const next = (db && typeof db === "object") ? db : createEmptyDb();
+  if (!Array.isArray(next.sessions)) next.sessions = [];
+  next.settings = { ...getDefaultSettings(), ...(next.settings || {}) };
+  next.version = Number(next.version) || DB_VERSION;
+  next.sessions = next.sessions
+    .filter(s => s && typeof s === "object")
+    .map(s => ({
+      ...s,
+      id: s.id || crypto.randomUUID(),
+      createdAt: s.createdAt || s.startedAt || todayISO(),
+      startedAt: s.startedAt || s.createdAt || todayISO(),
+      logs: (s.logs && typeof s.logs === "object") ? s.logs : {},
+      sessionNotes: s.sessionNotes || "",
+      sessionRating: Number(s.sessionRating) || 0,
+      isDraft: Boolean(s.isDraft && !s.finishedAt),
+    }));
+  return next;
 }
 
 function getDefaultSettings() {
@@ -501,6 +537,8 @@ function getDefaultSettings() {
     restTimerEnabled: true,
     soundEnabled: true,
     vibrationEnabled: true,
+    unit: "lb",
+    barWeight: 45,
   };
 }
 
@@ -545,6 +583,34 @@ function fmtDuration(seconds){
 }
 function getDay(dayId){ return PLAN.find(d => d.id === dayId); }
 
+function sessionHasActivity(session){
+  if (!session) return false;
+  if ((session.sessionNotes || "").trim() || Number(session.sessionRating) > 0 || session.finishedAt) return true;
+  return Object.values(session.logs || {}).some(log => {
+    if (!log) return false;
+    const hasSets = Array.isArray(log.sets) && log.sets.some(set =>
+      (set.weight || "").toString().trim() ||
+      (set.reps || "").toString().trim() ||
+      (set.note || "").toString().trim()
+    );
+    return hasSets || (log.note || "").trim() || Boolean(log.completed);
+  });
+}
+
+function getDisplaySessions(limit){
+  const sessions = load().sessions.filter(sessionHasActivity);
+  return Number.isFinite(limit) ? sessions.slice(0, limit) : sessions;
+}
+
+function cleanupActiveDraft(){
+  if (!state.activeSessionId || state.editMode) return;
+  const db = load();
+  const session = db.sessions.find(s => s.id === state.activeSessionId);
+  if (!session || sessionHasActivity(session)) return;
+  db.sessions = db.sessions.filter(s => s.id !== state.activeSessionId);
+  save(db);
+}
+
 function getOrCreateSession(dayId){
   const db = load();
   let s = db.sessions.find(x => x.id === state.activeSessionId);
@@ -553,6 +619,9 @@ function getOrCreateSession(dayId){
   const session = {
     id: crypto.randomUUID(),
     createdAt: todayISO(),
+    startedAt: todayISO(),
+    finishedAt: null,
+    isDraft: true,
     dayId,
     dayTitle: getDay(dayId).title,
     logs: {},
@@ -578,6 +647,8 @@ function updateExerciseLog(exName, updater){
   if (!s) return;
   if (!s.logs[exName]) s.logs[exName] = { sets: [], note: "", completed: false };
   updater(s.logs[exName]);
+  s.updatedAt = todayISO();
+  if (sessionHasActivity(s)) s.isDraft = false;
   save(db);
 }
 
@@ -593,10 +664,11 @@ function findLastLogForExercise(exName){
   return null;
 }
 
-function getExerciseHistory(exName, limit = 10){
+function getExerciseHistory(exName, limit = 10, excludeSessionId = null){
   const db = load();
   const entries = [];
   for (const s of db.sessions){
+    if (excludeSessionId && s.id === excludeSessionId) continue;
     if (s.logs && s.logs[exName] && (s.logs[exName].sets || []).length > 0) {
       entries.push({ session: s, log: s.logs[exName] });
     }
@@ -623,22 +695,24 @@ function calculateSessionVolume(session){
   return total;
 }
 
-function isPR(exName, sets){
-  const history = getExerciseHistory(exName, 20);
-  if (history.length === 0) return false;
+function isPR(exName, sets, options = {}){
+  const excludeSessionId = options.excludeSessionId || (state.editMode ? state.viewSessionId : state.activeSessionId);
+  const history = getExerciseHistory(exName, 20, excludeSessionId);
+  if (history.length === 0 || !sets || sets.length === 0) return false;
   
   const currentMax = Math.max(...sets.map(s => parseFloat(s.weight) || 0));
   const currentTotalVolume = calculateVolume(sets);
-  
-  for (const entry of history){
-    const histMax = Math.max(...entry.log.sets.map(s => parseFloat(s.weight) || 0));
-    const histVolume = calculateVolume(entry.log.sets);
-    
-    if (currentMax > histMax || currentTotalVolume > histVolume){
-      return true;
-    }
-  }
-  return false;
+  const bestPrior = history.reduce((best, entry) => {
+    const histSets = entry.log.sets || [];
+    const histMax = Math.max(...histSets.map(s => parseFloat(s.weight) || 0), 0);
+    const histVolume = calculateVolume(histSets);
+    return {
+      maxWeight: Math.max(best.maxWeight, histMax),
+      volume: Math.max(best.volume, histVolume),
+    };
+  }, { maxWeight: 0, volume: 0 });
+
+  return currentMax > bestPrior.maxWeight || currentTotalVolume > bestPrior.volume;
 }
 
 function compareToLast(exName, setIndex, weight, reps){
@@ -660,7 +734,7 @@ function compareToLast(exName, setIndex, weight, reps){
 }
 
 /** ========= Plate Calculator ========= */
-function calculatePlates(totalWeight, barWeight = 45){
+function calculatePlates(totalWeight, barWeight = load().settings.barWeight || 45){
   const weightPerSide = (totalWeight - barWeight) / 2;
   if (weightPerSide <= 0) return [];
   
@@ -681,9 +755,10 @@ function calculatePlates(totalWeight, barWeight = 45){
 function renderPlateCalculator(weight, exerciseType){
   if (exerciseType !== "barbell") return "";
   const w = parseFloat(weight);
-  if (!w || w <= 45) return "";
+  const barWeight = load().settings.barWeight || 45;
+  if (!w || w <= barWeight) return "";
   
-  const plates = calculatePlates(w);
+  const plates = calculatePlates(w, barWeight);
   if (plates.length === 0) return "";
   
   const plateGroups = {};
@@ -696,6 +771,8 @@ function renderPlateCalculator(weight, exerciseType){
     const className = `plate p${plate.replace('.', '-')}`;
     html += `<span class="${className}">${count}×${plate}lb</span>`;
   }
+  const unit = load().settings.unit || "lb";
+  html = html.replaceAll("lb", unit);
   html += '</div></div>';
   return html;
 }
@@ -823,23 +900,20 @@ function showConfetti(){
 function render(){
   const app = $("app");
   const footer = $("footerbar");
+  const backButton = $("btnBack");
   footer.style.display = (state.view === "day" || state.view === "log") ? "flex" : "none";
+  backButton.style.display = state.view === "home" ? "none" : "inline-block";
 
   if (state.view === "home"){
-    setHeader("Training Pro", "Pick your training day");
+    setHeader("Training Pro", "Home");
     const db = load();
-    const recentSessions = db.sessions.slice(0, 3);
+    const recentSessions = getDisplaySessions(3);
     
     app.innerHTML = `
-      <div class="card">
-        <h3>Training Days</h3>
-        <div class="grid2" style="margin-top:10px;">
-          ${PLAN.map(d => `
-            <button class="btn primary" style="width:100%;" onclick="goDay('${d.id}')">
-              ${d.dayLabel}<div class="muted" style="font-size:12px;margin-top:4px;">${d.title}</div>
-            </button>
-          `).join("")}
-        </div>
+      <div class="card" style="text-align:center;">
+        <h3>Ready to train?</h3>
+        <div class="muted" style="margin:8px 0 12px;">Start a workout, choose the training day, then jump between exercises in any order.</div>
+        <button class="btn primary" style="width:100%;padding:14px;font-size:16px;" onclick="goStartWorkout()">Start Workout</button>
         <div class="divider"></div>
         <div class="muted" style="font-size:12px;">Tip: On iPhone Safari, tap <span class="kbd">Share</span> → <span class="kbd">Add to Home Screen</span>.</div>
       </div>
@@ -878,6 +952,74 @@ function render(){
     return;
   }
 
+
+  if (state.view === "start"){
+    setHeader("Start Workout", "Choose a training day");
+    app.innerHTML = `
+      <div class="card">
+        <h3>Pick your training day</h3>
+        <div class="muted" style="margin-top:4px;">After you choose a day, you can open the exercises in whatever order you want.</div>
+        <div class="grid2" style="margin-top:12px;">
+          ${PLAN.map(d => `
+            <button class="btn primary" style="width:100%;" onclick="goDay('${d.id}')">
+              ${d.dayLabel}<div class="muted" style="font-size:12px;margin-top:4px;">${d.title}</div>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+
+
+  if (state.view === "settings"){
+    setHeader("Settings", "Timers, data, and app preferences");
+    const db = load();
+    const settings = db.settings;
+    const sessionCount = getDisplaySessions().length;
+
+    app.innerHTML = `
+      <div class="card">
+        <h3>Workout Defaults</h3>
+        <div class="grid2" style="margin-top:10px;">
+          <div>
+            <label class="muted" style="font-size:12px;margin-bottom:6px;display:block;" for="settingDefaultRest">Default rest (seconds)</label>
+            <input id="settingDefaultRest" type="number" min="15" step="15" value="${settings.restTimerDefault}" oninput="updateSetting('restTimerDefault', parseInt(this.value) || 60)" />
+          </div>
+          <div>
+            <label class="muted" style="font-size:12px;margin-bottom:6px;display:block;" for="settingBarWeight">Bar weight</label>
+            <input id="settingBarWeight" type="number" min="0" step="5" value="${settings.barWeight}" oninput="updateSetting('barWeight', parseFloat(this.value) || 45)" />
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label class="muted" style="font-size:12px;margin-bottom:6px;display:block;" for="settingUnit">Units</label>
+          <select id="settingUnit" onchange="updateSetting('unit', this.value)">
+            <option value="lb" ${settings.unit === 'lb' ? 'selected' : ''}>Pounds (lb)</option>
+            <option value="kg" ${settings.unit === 'kg' ? 'selected' : ''}>Kilograms (kg)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Rest Timer</h3>
+        ${renderToggle('restTimerEnabled', 'Enable rest timer', settings.restTimerEnabled)}
+        ${renderToggle('soundEnabled', 'Play timer sound', settings.soundEnabled)}
+        ${renderToggle('vibrationEnabled', 'Vibrate when timer ends', settings.vibrationEnabled)}
+      </div>
+
+      <div class="card">
+        <h3>Backup & Restore</h3>
+        <div class="muted" style="font-size:13px;margin-bottom:10px;">${sessionCount} saved workout${sessionCount === 1 ? '' : 's'} on this device. Export regularly so browser storage loss does not erase your history.</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap;">
+          <button class="btn" onclick="exportData()">Export JSON</button>
+          <button class="btn" onclick="openImportPicker()">Import JSON</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   if (state.view === "day"){
     const day = getDay(state.activeDayId);
     const session = state.editMode ? getCurrentSessionForEdit() : getOrCreateSession(day.id);
@@ -903,6 +1045,14 @@ function render(){
     `;
 
     app.innerHTML = `
+      <div class="card">
+        <h3>Workout List</h3>
+        <div class="muted" style="font-size:13px;">Tap any exercise below. You can come back here with Back, or use Previous/Next and the exercise picker while logging.</div>
+        <div style="margin-top:10px;">
+          <button class="btn primary" onclick="goLog('${escapeQuotes(allExercises[0].name)}')">Start first exercise</button>
+        </div>
+      </div>
+
       ${state.editMode ? `
         <div class="card" style="background:rgba(255,171,0,0.1);border-color:rgba(255,171,0,0.3);">
           <div class="row" style="justify-content:space-between;align-items:center;">
@@ -950,7 +1100,7 @@ function render(){
     const rxText = exDef ? exDef.rx : "";
     const noteText = exDef ? exDef.note : "";
     const exerciseType = exDef ? exDef.type : "other";
-    const defaultRestTime = exDef ? exDef.restTime : 90;
+    const defaultRestTime = exDef ? exDef.restTime : (load().settings.restTimerDefault || 90);
     const videoUrl = exDef ? exDef.videoUrl : "";
 
     setHeader(exName, `${day.dayLabel} • ${day.title}`);
@@ -973,6 +1123,8 @@ function render(){
           <div class="muted" style="margin-top:4px;">New PR on this exercise!</div>
         </div>
       ` : ''}
+
+      ${renderExerciseNavigator(exName)}
       
       <div class="card">
         <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -1033,7 +1185,7 @@ function render(){
     app.innerHTML = `
       <div class="card">
         <h3>All Sessions</h3>
-        ${db.sessions.length ? db.sessions.slice(0,50).map(s => {
+        ${getDisplaySessions(50).length ? getDisplaySessions(50).map(s => {
           const volume = calculateSessionVolume(s);
           const exerciseCount = Object.keys(s.logs || {}).length;
           return `
@@ -1126,6 +1278,47 @@ function render(){
 }
 
 /** ========= Small render helpers ========= */
+
+
+function getActiveExercises(){
+  const day = getDay(state.activeDayId);
+  return day ? day.blocks.flatMap(b => b.items) : [];
+}
+
+function renderExerciseNavigator(exName){
+  const exercises = getActiveExercises();
+  const idx = exercises.findIndex(ex => ex.name === exName);
+  const prev = idx > 0 ? exercises[idx - 1] : null;
+  const next = idx >= 0 && idx < exercises.length - 1 ? exercises[idx + 1] : null;
+
+  return `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <button class="btn small" onclick="goBack()">← Exercise list</button>
+        <div class="row" style="gap:6px;">
+          <button class="btn small" ${prev ? `onclick="goLog('${escapeQuotes(prev.name)}')"` : 'disabled'}>Previous</button>
+          <button class="btn small" ${next ? `onclick="goLog('${escapeQuotes(next.name)}')"` : 'disabled'}>Next</button>
+        </div>
+      </div>
+      <label class="muted" style="font-size:12px;margin:10px 0 6px;display:block;" for="exerciseJump">Jump to any exercise</label>
+      <select id="exerciseJump" onchange="goLog(this.value)">
+        ${exercises.map(ex => `<option value="${escapeHtml(ex.name)}" ${ex.name === exName ? 'selected' : ''}>${escapeHtml(ex.name)}</option>`).join('')}
+      </select>
+    </div>
+  `;
+}
+
+function renderToggle(key, label, checked){
+  return `
+    <label class="list-item" style="cursor:pointer;">
+      <div class="top">
+        <div class="name">${label}</div>
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="updateSetting('${key}', this.checked)" style="width:auto;" />
+      </div>
+    </label>
+  `;
+}
+
 function renderLastLine(exName){
   const last = findLastLogForExercise(exName);
   if (!last) return `<div class="muted" style="font-size:12px;">No previous log</div>`;
@@ -1238,7 +1431,7 @@ function renderExerciseHistory(exName){
             const maxSetWeight = Math.max(...e.log.sets.map(s => parseFloat(s.weight) || 0));
             const height = (maxSetWeight / maxWeight) * 100;
             const volume = calculateVolume(e.log.sets);
-            const wasPR = isPR(exName, e.log.sets);
+            const wasPR = isPR(exName, e.log.sets, { excludeSessionId: e.session.id });
             
             return `
               <div 
@@ -1278,11 +1471,44 @@ function renderExerciseHistory(exName){
 }
 
 /** ========= Actions ========= */
+function goStartWorkout(){
+  cleanupActiveDraft();
+  state.view = "start";
+  state.activeDayId = null;
+  state.activeExerciseName = null;
+  state.editMode = false;
+  state.viewSessionId = null;
+  render();
+}
+
+function goBack(){
+  if (state.view === "log"){
+    state.view = "day";
+    state.activeExerciseName = null;
+    render();
+    return;
+  }
+  if (state.view === "day"){
+    if (state.editMode){ exitEditMode(); return; }
+    cleanupActiveDraft();
+    state.view = "start";
+    state.activeExerciseName = null;
+    render();
+    return;
+  }
+  goHome();
+}
+
 function goDay(dayId){
+  cleanupActiveDraft();
+  const continueActiveSession = Boolean(state.activeSessionId && state.activeDayId === dayId && !state.editMode);
   state.view = "day";
   state.activeDayId = dayId;
   state.activeExerciseName = null;
-  state.activeSessionId = null;
+  if (!continueActiveSession){
+    state.activeSessionId = null;
+    state.sessionStartTime = null;
+  }
   state.editMode = false;
   render();
 }
@@ -1294,6 +1520,7 @@ function goLog(exName){
 }
 
 function goHome(){
+  cleanupActiveDraft();
   state.view = "home";
   state.activeDayId = null;
   state.activeExerciseName = null;
@@ -1305,13 +1532,30 @@ function goHome(){
   render();
 }
 
+
+function goSettings(){
+  cleanupActiveDraft();
+  state.view = "settings";
+  state.editMode = false;
+  render();
+}
+
+function updateSetting(key, value){
+  const db = load();
+  if (!(key in getDefaultSettings())) return;
+  db.settings[key] = value;
+  save(db);
+}
+
 function goHistory(){
+  cleanupActiveDraft();
   state.view = "history";
   state.editMode = false;
   render();
 }
 
 function viewSession(sessionId){
+  cleanupActiveDraft();
   state.view = "session";
   state.viewSessionId = sessionId;
   state.editMode = false;
@@ -1349,7 +1593,7 @@ function addSet(exName){
   // Get default rest time from exercise definition
   const day = getDay(state.activeDayId);
   const exDef = day.blocks.flatMap(b => b.items).find(i => i.name === exName);
-  const defaultRestTime = exDef ? exDef.restTime : 60;
+  const defaultRestTime = exDef ? exDef.restTime : (load().settings.restTimerDefault || 60);
   
   updateExerciseLog(exName, (log) => {
     const newSet = {
@@ -1469,7 +1713,7 @@ function copyLast(exName){
   // Get default rest time
   const day = getDay(state.activeDayId);
   const exDef = day.blocks.flatMap(b => b.items).find(i => i.name === exName);
-  const defaultRestTime = exDef ? exDef.restTime : 90;
+  const defaultRestTime = exDef ? exDef.restTime : (load().settings.restTimerDefault || 90);
   
   updateExerciseLog(exName, (log) => {
     log.sets = (last.log.sets || []).map(s => ({ 
@@ -1537,6 +1781,9 @@ function saveAndFinish(){
   if (s){
     s.sessionNotes = notes;
     s.sessionRating = rating;
+    s.finishedAt = todayISO();
+    s.durationSeconds = s.startedAt ? Math.max(0, Math.round((new Date(s.finishedAt) - new Date(s.startedAt)) / 1000)) : null;
+    s.isDraft = false;
     save(db);
   }
   
@@ -1558,6 +1805,35 @@ function exportData(){
   a.download = `training_logs_${new Date().toISOString().split('T')[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function openImportPicker(){
+  $("importFile").click();
+}
+
+function importData(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = migrateDb(JSON.parse(reader.result));
+      const count = imported.sessions.filter(sessionHasActivity).length;
+      const ok = confirm(`Import ${count} workout${count === 1 ? "" : "s"}? This will replace data currently stored on this device.`);
+      if (!ok) return;
+      save(imported);
+      state.activeSessionId = null;
+      state.viewSessionId = null;
+      state.editMode = false;
+      alert("Import complete.");
+      goHome();
+    } catch (error) {
+      console.error(error);
+      alert("Import failed. Please choose a valid Training Pro JSON export.");
+    } finally {
+      $("importFile").value = "";
+    }
+  };
+  reader.readAsText(file);
 }
 
 function resetAll(){
@@ -1582,10 +1858,14 @@ function escapeHtml(s){
 }
 
 /** ========= Wire buttons ========= */
+$("btnBack").addEventListener("click", goBack);
 $("btnHome").addEventListener("click", goHome);
+$("btnSettings").addEventListener("click", goSettings);
 $("btnHistory").addEventListener("click", goHistory);
 $("btnFinish").addEventListener("click", finishSession);
 $("btnExport").addEventListener("click", exportData);
+$("btnImport").addEventListener("click", openImportPicker);
+$("importFile").addEventListener("change", event => importData(event.target.files[0]));
 $("btnReset").addEventListener("click", resetAll);
 
 // Session duration update
@@ -1594,6 +1874,15 @@ setInterval(() => {
     render();
   }
 }, 30000);
+
+
+if ("serviceWorker" in navigator && location.protocol !== "file:"){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(error => {
+      console.warn("Service worker registration failed", error);
+    });
+  });
+}
 
 render();
 </script>
