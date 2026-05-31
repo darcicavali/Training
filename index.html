@@ -514,21 +514,100 @@ function save(db) {
 function migrateDb(db) {
   const next = (db && typeof db === "object") ? db : createEmptyDb();
   if (!Array.isArray(next.sessions)) next.sessions = [];
-  next.settings = { ...getDefaultSettings(), ...(next.settings || {}) };
+  next.settings = sanitizeSettings({ ...getDefaultSettings(), ...(next.settings || {}) });
   next.version = Number(next.version) || DB_VERSION;
   next.sessions = next.sessions
     .filter(s => s && typeof s === "object")
-    .map(s => ({
-      ...s,
-      id: s.id || crypto.randomUUID(),
-      createdAt: s.createdAt || s.startedAt || todayISO(),
-      startedAt: s.startedAt || s.createdAt || todayISO(),
-      logs: (s.logs && typeof s.logs === "object") ? s.logs : {},
-      sessionNotes: s.sessionNotes || "",
-      sessionRating: Number(s.sessionRating) || 0,
-      isDraft: Boolean(s.isDraft && !s.finishedAt),
-    }));
+    .map(s => sanitizeSession(s, next.settings));
   return next;
+}
+
+function sanitizeSettings(settings){
+  const unit = sanitizeUnit(settings.unit);
+  return {
+    restTimerDefault: clampNumber(settings.restTimerDefault, 15, 600, 60),
+    restTimerEnabled: Boolean(settings.restTimerEnabled),
+    soundEnabled: Boolean(settings.soundEnabled),
+    vibrationEnabled: Boolean(settings.vibrationEnabled),
+    unit,
+    barWeight: clampNumber(settings.barWeight, 0, 100, unit === "kg" ? 20 : 45),
+  };
+}
+
+function sanitizeSession(session, settings){
+  const day = getDay(session.dayId) || PLAN[0];
+  const unit = sanitizeUnit(session.unit || settings.unit);
+  const createdAt = validDateString(session.createdAt || session.startedAt) || todayISO();
+  const startedAt = validDateString(session.startedAt || session.createdAt) || createdAt;
+  const finishedAt = validDateString(session.finishedAt) || null;
+  return {
+    id: sanitizeId(session.id),
+    createdAt,
+    startedAt,
+    finishedAt,
+    durationSeconds: session.durationSeconds == null ? null : clampNumber(session.durationSeconds, 0, 86400, 0),
+    updatedAt: validDateString(session.updatedAt) || null,
+    isDraft: Boolean(session.isDraft && !finishedAt),
+    unit,
+    dayId: day.id,
+    dayTitle: day.title,
+    logs: sanitizeLogs(session.logs, day),
+    sessionNotes: safeText(session.sessionNotes, 2000),
+    sessionRating: clampNumber(session.sessionRating, 0, 5, 0),
+  };
+}
+
+function sanitizeLogs(logs, day){
+  if (!logs || typeof logs !== "object") return {};
+  const allowed = new Set(day.blocks.flatMap(block => block.items).map(item => item.name));
+  const clean = {};
+  for (const [name, log] of Object.entries(logs)){
+    if (!allowed.has(name) || !log || typeof log !== "object") continue;
+    clean[name] = {
+      sets: Array.isArray(log.sets) ? log.sets.slice(0, 50).map(sanitizeSet) : [],
+      note: safeText(log.note, 1000),
+      completed: Boolean(log.completed),
+    };
+  }
+  return clean;
+}
+
+function sanitizeSet(set){
+  const item = set && typeof set === "object" ? set : {};
+  return {
+    weight: safeNumberText(item.weight, 8),
+    reps: safeNumberText(item.reps, 5),
+    note: safeText(item.note, 500),
+    restTime: clampNumber(item.restTime, 15, 600, 60),
+  };
+}
+
+function sanitizeUnit(unit){
+  return unit === "kg" ? "kg" : "lb";
+}
+
+function sanitizeId(id){
+  const text = String(id || "");
+  return /^[A-Za-z0-9_-]{1,80}$/.test(text) ? text : crypto.randomUUID();
+}
+
+function validDateString(value){
+  const text = String(value || "");
+  return Number.isNaN(Date.parse(text)) ? null : text;
+}
+
+function safeText(value, maxLength){
+  return String(value || "").slice(0, maxLength);
+}
+
+function safeNumberText(value, maxLength){
+  return String(value ?? "").replace(/[^0-9.\-]/g, "").slice(0, maxLength);
+}
+
+function clampNumber(value, min, max, fallback){
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
 }
 
 function getDefaultSettings() {
@@ -624,6 +703,7 @@ function getOrCreateSession(dayId){
     isDraft: true,
     dayId,
     dayTitle: getDay(dayId).title,
+    unit: getWeightUnit(),
     logs: {},
     sessionNotes: "",
     sessionRating: 0,
@@ -647,6 +727,7 @@ function updateExerciseLog(exName, updater){
   if (!s) return;
   if (!s.logs[exName]) s.logs[exName] = { sets: [], note: "", completed: false };
   updater(s.logs[exName]);
+  if (!s.unit) s.unit = getWeightUnit();
   s.updatedAt = todayISO();
   if (sessionHasActivity(s)) s.isDraft = false;
   save(db);
@@ -685,6 +766,14 @@ function calculateVolume(sets){
   }, 0);
 }
 
+function calculateBaseVolume(sets, unit){
+  return sets.reduce((sum, s) => {
+    const w = toBaseWeight(parseFloat(s.weight) || 0, unit);
+    const r = parseInt(s.reps) || 0;
+    return sum + (w * r);
+  }, 0);
+}
+
 function calculateSessionVolume(session){
   if (!session || !session.logs) return 0;
   let total = 0;
@@ -700,12 +789,14 @@ function isPR(exName, sets, options = {}){
   const history = getExerciseHistory(exName, 20, excludeSessionId);
   if (history.length === 0 || !sets || sets.length === 0) return false;
   
-  const currentMax = Math.max(...sets.map(s => parseFloat(s.weight) || 0));
-  const currentTotalVolume = calculateVolume(sets);
+  const currentUnit = options.unit || getWeightUnit();
+  const currentMax = Math.max(...sets.map(s => toBaseWeight(parseFloat(s.weight) || 0, currentUnit)));
+  const currentTotalVolume = calculateBaseVolume(sets, currentUnit);
   const bestPrior = history.reduce((best, entry) => {
+    const histUnit = getSessionUnit(entry.session);
     const histSets = entry.log.sets || [];
-    const histMax = Math.max(...histSets.map(s => parseFloat(s.weight) || 0), 0);
-    const histVolume = calculateVolume(histSets);
+    const histMax = Math.max(...histSets.map(s => toBaseWeight(parseFloat(s.weight) || 0, histUnit)), 0);
+    const histVolume = calculateBaseVolume(histSets, histUnit);
     return {
       maxWeight: Math.max(best.maxWeight, histMax),
       volume: Math.max(best.volume, histVolume),
@@ -734,8 +825,18 @@ function compareToLast(exName, setIndex, weight, reps){
 }
 
 /** ========= Plate Calculator ========= */
-function getWeightUnit(){
-  return load().settings.unit || "lb";
+function getSessionUnit(session){
+  return sanitizeUnit(session && session.unit ? session.unit : load().settings.unit);
+}
+
+function getWeightUnit(session = null){
+  if (session) return getSessionUnit(session);
+  const current = state.editMode ? getCurrentSessionForEdit() : getCurrentSession();
+  return getSessionUnit(current);
+}
+
+function toBaseWeight(weight, unit){
+  return sanitizeUnit(unit) === "kg" ? weight * 2.2046226218 : weight;
 }
 
 function getPlateDenominations(unit = getWeightUnit()){
@@ -764,7 +865,7 @@ function renderPlateCalculator(weight, exerciseType){
   if (exerciseType !== "barbell") return "";
   const w = parseFloat(weight);
   const settings = load().settings;
-  const unit = settings.unit || "lb";
+  const unit = getWeightUnit();
   const barWeight = settings.barWeight || (unit === "kg" ? 20 : 45);
   if (!w || w <= barWeight) return "";
   
@@ -933,13 +1034,13 @@ function render(){
             const volume = calculateSessionVolume(s);
             const exerciseCount = Object.keys(s.logs || {}).length;
             return `
-              <div class="list-item" onclick="viewSession('${s.id}')">
+              <div class="list-item" onclick="viewSession('${escapeQuotes(s.id)}')">
                 <div class="top">
-                  <div class="name">${s.dayTitle}</div>
+                  <div class="name">${escapeHtml(s.dayTitle)}</div>
                   <div class="rx">${fmtDateShort(s.createdAt)}</div>
                 </div>
                 <div class="row" style="gap:8px;margin-top:4px;flex-wrap:wrap;">
-                  <span class="stats-badge"><span class="icon">💪</span> ${volume.toLocaleString()} ${getWeightUnit()}</span>
+                  <span class="stats-badge"><span class="icon">💪</span> ${volume.toLocaleString()} ${getSessionUnit(s)}</span>
                   <span class="stats-badge"><span class="icon">📋</span> ${exerciseCount} exercises</span>
                   ${s.sessionRating > 0 ? `<span class="stats-badge"><span class="icon">${'⭐'.repeat(s.sessionRating)}</span></span>` : ''}
                 </div>
@@ -1045,7 +1146,7 @@ function render(){
 
     $("footerLeft").innerHTML = `
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <div class="muted" style="font-size:12px;">${!state.editMode ? `⏱️ ${fmtDuration(elapsed)} • ` : ''}💪 ${totalVolume.toLocaleString()}${getWeightUnit()}</div>
+        <div class="muted" style="font-size:12px;">${!state.editMode ? `⏱️ ${fmtDuration(elapsed)} • ` : ''}💪 ${totalVolume.toLocaleString()}${getSessionUnit(session)}</div>
         <div class="progress-bar" style="width:120px;">
           <div class="fill" style="width:${progress}%"></div>
         </div>
@@ -1199,18 +1300,18 @@ function render(){
           return `
             <div class="list-item">
               <div class="top">
-                <div class="name">${s.dayTitle}</div>
+                <div class="name">${escapeHtml(s.dayTitle)}</div>
                 <div class="rx">${fmtDate(s.createdAt)}</div>
               </div>
               <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap;">
-                <span class="stats-badge"><span class="icon">💪</span> ${volume.toLocaleString()} ${getWeightUnit()}</span>
+                <span class="stats-badge"><span class="icon">💪</span> ${volume.toLocaleString()} ${getSessionUnit(s)}</span>
                 <span class="stats-badge"><span class="icon">📋</span> ${exerciseCount} exercises</span>
                 ${s.sessionRating > 0 ? `<span class="stats-badge">${'⭐'.repeat(s.sessionRating)}</span>` : ''}
               </div>
               ${s.sessionNotes ? `<div class="note" style="margin-top:6px;">${escapeHtml(s.sessionNotes)}</div>` : ''}
               <div class="row" style="gap:6px;margin-top:8px;">
-                <button class="btn small" onclick="viewSession('${s.id}')" style="flex:1;">View</button>
-                <button class="btn small" onclick="editSession('${s.id}')" style="flex:1;">Edit</button>
+                <button class="btn small" onclick="viewSession('${escapeQuotes(s.id)}')" style="flex:1;">View</button>
+                <button class="btn small" onclick="editSession('${escapeQuotes(s.id)}')" style="flex:1;">Edit</button>
               </div>
             </div>
           `;
@@ -1241,7 +1342,7 @@ function render(){
       <div class="card">
         <h3>Session Summary</h3>
         <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:10px;">
-          <span class="stats-badge"><span class="icon">💪</span> ${volume.toLocaleString()} ${getWeightUnit()} total</span>
+          <span class="stats-badge"><span class="icon">💪</span> ${volume.toLocaleString()} ${getSessionUnit(session)} total</span>
           <span class="stats-badge"><span class="icon">📋</span> ${Object.keys(session.logs || {}).length} exercises</span>
           ${session.sessionRating > 0 ? `<span class="stats-badge">${'⭐'.repeat(session.sessionRating)}</span>` : ''}
         </div>
@@ -1252,7 +1353,7 @@ function render(){
           </div>
         ` : ''}
         <div class="row" style="gap:10px;margin-top:12px;">
-          <button class="btn" onclick="editSession('${session.id}')" style="flex:1;">✏️ Edit Workout</button>
+          <button class="btn" onclick="editSession('${escapeQuotes(session.id)}')" style="flex:1;">✏️ Edit Workout</button>
         </div>
       </div>
 
@@ -1427,7 +1528,7 @@ function renderExerciseHistory(exName){
     </div>
   `;
   
-  const allWeights = entries.flatMap(e => e.log.sets.map(s => parseFloat(s.weight) || 0));
+  const allWeights = entries.flatMap(e => e.log.sets.map(s => toBaseWeight(parseFloat(s.weight) || 0, getSessionUnit(e.session))));
   const maxWeight = Math.max(...allWeights, 1);
   
   return `
@@ -1436,8 +1537,10 @@ function renderExerciseHistory(exName){
       <div class="chart">
         <div class="chart-bars">
           ${entries.slice(0, 8).reverse().map(e => {
+            const sessionUnit = getSessionUnit(e.session);
             const maxSetWeight = Math.max(...e.log.sets.map(s => parseFloat(s.weight) || 0));
-            const height = (maxSetWeight / maxWeight) * 100;
+            const maxSetWeightBase = toBaseWeight(maxSetWeight, sessionUnit);
+            const height = (maxSetWeightBase / maxWeight) * 100;
             const volume = calculateVolume(e.log.sets);
             const wasPR = isPR(exName, e.log.sets, { excludeSessionId: e.session.id });
             
@@ -1445,7 +1548,7 @@ function renderExerciseHistory(exName){
               <div 
                 class="chart-bar ${wasPR ? 'pr' : ''}" 
                 style="height:${height}%;"
-                title="${maxSetWeight}${getWeightUnit()} max, ${volume}${getWeightUnit()} total"
+                title="${maxSetWeight}${sessionUnit} max, ${volume}${sessionUnit} total"
               ></div>
             `;
           }).join("")}
@@ -1468,9 +1571,9 @@ function renderExerciseHistory(exName){
         <div class="list-item">
           <div class="top">
             <div class="name">${fmtDate(e.session.createdAt)}</div>
-            <div class="rx">${e.session.dayTitle}</div>
+            <div class="rx">${escapeHtml(e.session.dayTitle)}</div>
           </div>
-          <div class="note">${(e.log.sets||[]).map(s => `${s.weight || "BW"}×${s.reps || "—"}`).join(" • ")}</div>
+          <div class="note">${(e.log.sets||[]).map(s => `${s.weight || "BW"}${getSessionUnit(e.session)}×${s.reps || "—"}`).join(" • ")}</div>
           ${e.log.note ? `<div class="muted" style="font-size:11px;margin-top:4px;">${escapeHtml(e.log.note)}</div>` : ''}
         </div>
       `).join("")}
