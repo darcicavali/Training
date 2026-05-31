@@ -1,0 +1,12 @@
+{
+  "name": "Training Pro",
+  "short_name": "Training Pro",
+  "description": "Offline workout logging, rest timers, history, and progress tracking.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
+  "orientation": "portrait-primary",
+  "categories": ["health", "fitness", "productivity"]
+}
